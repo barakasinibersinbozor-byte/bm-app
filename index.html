@@ -18,13 +18,15 @@ input{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1p
 <h2 id="t">Baraka Mebel</h2><nav id="nav"></nav><div id="v">Yuklanmoqda…</div>
 <script>
 // >>> Apps Script Web app manzilini (…/exec) shu yerga yozing <<<
-const API="PASTE_WEBAPP_EXEC_URL_HERE";
+const API="https://script.google.com/macros/s/AKfycbx2qNaeflDrlARbQHCjXUFbxCcmQHNKJq32HnoLEG0kkVPq2ElJ97UVOtjtNiA3otX7/exec";
 const tg=Telegram.WebApp;tg.ready();tg.expand();
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const som=n=>Math.round(n||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g," ")+" so'm";
 async function api(action,x){
-  try{const r=await fetch(API,{method:"POST",body:JSON.stringify(Object.assign({mini:1,initData:tg.initData,action},x||{}))});return await r.json();}
-  catch(e){return{ok:false,error:"Tarmoq xatosi"}}
+  let r,t;
+  try{r=await fetch(API,{method:"POST",redirect:"follow",body:JSON.stringify(Object.assign({mini:1,initData:tg.initData,action},x||{}))});t=await r.text();}
+  catch(e){return{ok:false,error:"Tarmoq xatosi: "+(e&&e.message||e)}}
+  try{return JSON.parse(t)}catch(e){return{ok:false,error:"Server javobi noto'g'ri (HTTP "+r.status+"): "+t.replace(/<[^>]+>/g," ").slice(0,200)}}
 }
 const show=h=>$("v").innerHTML=h, err=r=>show('<div class="c">❌ '+esc(r.error||"Xato")+'</div>');
 function tabs(list,cur){$("nav").innerHTML=list.map(([k,l])=>`<button class="${k==cur?'on':''}" onclick="go('${k}')">${l}</button>`).join("")}

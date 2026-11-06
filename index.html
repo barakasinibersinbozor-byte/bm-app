@@ -1,0 +1,90 @@
+<!DOCTYPE html><html lang="uz"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Baraka Mebel</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#fff;--fg:#1c1c1e;--card:#f2f2f7;--ac:#8c4a54;--mut:#8e8e93}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1e;--fg:#f2f2f7;--card:#2c2c2e}}
+body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg);padding:12px;padding-bottom:env(safe-area-inset-bottom)}
+h2{margin:4px 0 10px;font-size:18px}
+nav{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px}
+button{border:0;border-radius:10px;padding:9px 12px;background:var(--card);color:var(--fg);font:inherit;white-space:nowrap}
+button.on,button.p{background:var(--ac);color:#fff}
+.c{background:var(--card);border-radius:12px;padding:10px;margin-bottom:8px}
+pre{white-space:pre-wrap;word-break:break-word;font:inherit;margin:0}
+input{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--mut);font:inherit;margin-bottom:8px;background:var(--bg);color:var(--fg)}
+.m{color:var(--mut)}
+</style></head><body>
+<h2 id="t">Baraka Mebel</h2><nav id="nav"></nav><div id="v">Yuklanmoqda…</div>
+<script>
+// >>> Apps Script Web app manzilini (…/exec) shu yerga yozing <<<
+const API="PASTE_WEBAPP_EXEC_URL_HERE";
+const tg=Telegram.WebApp;tg.ready();tg.expand();
+const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const som=n=>Math.round(n||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g," ")+" so'm";
+async function api(action,x){
+  try{const r=await fetch(API,{method:"POST",body:JSON.stringify(Object.assign({mini:1,initData:tg.initData,action},x||{}))});return await r.json();}
+  catch(e){return{ok:false,error:"Tarmoq xatosi"}}
+}
+const show=h=>$("v").innerHTML=h, err=r=>show('<div class="c">❌ '+esc(r.error||"Xato")+'</div>');
+function tabs(list,cur){$("nav").innerHTML=list.map(([k,l])=>`<button class="${k==cur?'on':''}" onclick="go('${k}')">${l}</button>`).join("")}
+let ROLE;
+const TABS={
+ MIJOZ:[["order","📦 Buyurtma"]],
+ USTA:[["jobs","🆕 Ishlar"],["earn","💰 Ish haqim"],["order","📦 Holat"]],
+ ADMIN:[["adm_orders","📦 Buyurtmalar"],["q:ARRA","🔪 Arra"],["q:KROMKA","🔵 Kromka"],["q:PRISADKA","🕳 Prisadka"],["adm_workers","👷 Ishchilar"],["adm_wages","💰 Ish haqi"],["debts","💳 To\'lov"],["adm_report","📊 Hisobot"],["adm_problems","🤒 Muammoli"]]
+};
+async function go(k){
+  tabs(TABS[ROLE],k);show('<span class="m">Yuklanmoqda…</span>');
+  if(k=="order")return orderView();
+  if(k=="jobs")return jobs();
+  if(k=="earn"){const r=await api("earnings");if(!r.ok)return err(r);
+    return show(`<div class="c">📅 Bugun: ${som(r.bugun)}<br>📆 Shu oy: ${som(r.oy)}<br>💵 Jami: ${som(r.jami)}<br>✅ To'langan: ${som(r.tolangan)}<br>⏳ Qarz: <b>${som(r.qolgan)}</b></div>`)}
+  if(k=="debts")return debts();
+  const q=k.startsWith("q:");
+  const r=await api(q?"adm_queue":k,q?{xizmat:k.slice(2)}:{});
+  r.ok?show('<div class="c"><pre>'+esc(r.text)+'</pre></div>'+(k=="adm_orders"?'<input id="on" placeholder="Buyurtma №"><button class="p" onclick="admOrder()">Tafsilot</button>':'')):err(r);
+}
+function orderView(){show('<input id="on" placeholder="Buyurtma raqami (B-00001)"><button class="p" onclick="ord()">Ko\'rish</button><div id="o"></div>')}
+async function ord(){const r=await api("order",{orderNo:$("on").value.trim()});$("o").innerHTML=r.ok?'<div class="c"><pre>'+esc(r.text)+'</pre></div>':'<div class="c">❌ '+esc(r.error)+'</div>'}
+async function admOrder(){const r=await api("adm_order",{orderNo:$("on").value.trim()});if(r.ok)show('<div class="c"><pre>'+esc(r.text)+'</pre></div><button onclick="go(\'adm_orders\')">← Orqaga</button>');else err(r)}
+const card=(e,btn)=>`<div class="c"><b>${esc(e.orderNo)}</b> — ${esc(e.xizmat)}<br><span class="m">${esc(e.miqdor)} ${esc(e.birlik)} · ${esc(e.holat)}</span><br><br>${btn}</div>`;
+async function debts(){
+  const r=await api("adm_debts");if(!r.ok)return err(r);
+  window.D=r.ustalar;
+  show(r.ustalar.map((u,i)=>`<div class="c"><b>${esc(u.ism)}</b><br>Hisoblangan: ${som(u.hisoblangan)}<br>Tasdiqlangan: ${som(u.tasdiqlangan)}<br><b>Qarz: ${som(u.hisoblangan+u.tasdiqlangan)}</b><br><br>`+(u.hisoblangan?`<button onclick="adm('approve',${i})">✔ Tasdiqlash</button> `:'')+`<button class="p" onclick="adm('pay',${i})">💵 To'lash</button></div>`).join("")||'<p class="m">Qarz yo\'q 🎉</p>');
+}
+function adm(t,i){
+  const u=D[i];
+  if(t=="approve")return tg.showConfirm(u.ism+": hisoblangan "+som(u.hisoblangan)+" tasdiqlansinmi?",async ok=>{if(!ok)return;const r=await api("adm_approve",{usta:u.ustaId});tg.showAlert(r.ok?"✅ "+r.soni+" ta yozuv tasdiqlandi":r.error);debts()});
+  show(`<div class="c"><b>${esc(u.ism)}</b><br>Qarz: ${som(u.hisoblangan+u.tasdiqlangan)}<br><br>Summa (bo'sh = hammasi):<input id="am" type="number" inputmode="decimal" min="0" step="any"><button class="p" onclick="pay(${i})">To'lash</button> <button onclick="debts()">Bekor</button></div>`);
+}
+function pay(i){
+  const u=D[i],a=$("am").value.replace(",","."),t=a?som(parseFloat(a)):"BARCHA qarz ("+som(u.hisoblangan+u.tasdiqlangan)+")";
+  tg.showConfirm(u.ism+"ga "+t+" to'lansinmi?",async ok=>{
+    if(!ok)return;
+    const r=await api("adm_pay",{usta:u.ustaId,amount:a});
+    tg.showAlert(r.ok?"✅ To'landi: "+som(r.tolangan)+"\nQolgan qarz: "+som(r.qolganQarz):r.error);debts()
+  });
+}
+async function jobs(){
+  const r=await api("jobs");if(!r.ok)return err(r);
+  let h="<h2>Mening ishlarim</h2>";
+  h+=r.mine.map(e=>card(e,e.holat=="QABUL QILINDI"?`<button class="p" onclick="act('start','${e.etapId}')">🔨 Boshlash</button>`:`<button class="p" onclick="fin('${e.etapId}')">✅ Tugatdim</button>`)).join("")||'<p class="m">Faol ish yo\'q</p>';
+  h+="<h2>Yangi ishlar</h2>"+(r.open.map(e=>card(e,`<button class="p" onclick="act('accept','${e.etapId}')">📥 Qabul qilish</button>`)).join("")||'<p class="m">Hozircha yangi ish yo\'q 🙌</p>');
+  show(h);
+}
+async function act(a,id){const r=await api(a,{etapId:id});r.ok?(tg.HapticFeedback&&tg.HapticFeedback.notificationOccurred("success"),jobs()):(tg.showAlert(r.error),jobs())}
+function fin(id){show(`<div class="c">Necha ta/metr bajardingiz?<br><br><input id="q" type="number" inputmode="decimal" min="0" step="any"><button class="p" onclick="done('${id}')">Tasdiqlash</button> <button onclick="jobs()">Bekor</button></div>`)}
+async function done(id){
+  const q=parseFloat($("q").value.replace(",","."));if(isNaN(q)||q<0)return tg.showAlert("To'g'ri son kiriting");
+  const r=await api("complete",{etapId:id,qty:q});
+  if(r.ok){tg.showAlert("✅ Tugatildi. Ish haqi: "+som(r.ishHaqi));jobs()}else{tg.showAlert(r.error);jobs()}
+}
+(async()=>{
+  if(!tg.initData)return show('<div class="c">Bu ilovani Telegram botingiz ichidan oching.</div>');
+  const r=await api("me");if(!r.ok)return err(r);
+  ROLE=r.role;$("t").textContent="👋 "+r.fish;
+  go(TABS[ROLE][0][0]);
+})();
+</script></body></html>

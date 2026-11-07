@@ -34,7 +34,7 @@ let ROLE;
 const TABS={
  MIJOZ:[["order","📦 Buyurtma"]],
  USTA:[["jobs","🆕 Ishlar"],["earn","💰 Ish haqim"],["order","📦 Holat"]],
- ADMIN:[["adm_orders","📦 Buyurtmalar"],["q:ARRA","🔪 Arra"],["q:KROMKA","🔵 Kromka"],["q:PRISADKA","🕳 Prisadka"],["adm_workers","👷 Ishchilar"],["adm_wages","💰 Ish haqi"],["debts","💳 To\'lov"],["adm_report","📊 Hisobot"],["adm_problems","🤒 Muammoli"]]
+ ADMIN:[["adm_orders","📦 Buyurtmalar"],["q:ARRA","🔪 Arra"],["q:KROMKA","🔵 Kromka"],["q:PRISADKA","🕳 Prisadka"],["adm_workers","👷 Ishchilar"],["adm_wages","💰 Ish haqi"],["dash","📊 Oyliklar"],["debts","💳 To\'lov"],["adm_report","📊 Hisobot"],["adm_problems","🤒 Muammoli"]]
 };
 async function go(k){
   tabs(TABS[ROLE],k);show('<span class="m">Yuklanmoqda…</span>');
@@ -43,6 +43,7 @@ async function go(k){
   if(k=="earn"){const r=await api("earnings");if(!r.ok)return err(r);
     return show(`<div class="c">📅 Bugun: ${som(r.bugun)}<br>📆 Shu oy: ${som(r.oy)}<br>💵 Jami: ${som(r.jami)}<br>✅ To'langan: ${som(r.tolangan)}<br>⏳ To'lanishi kerak: <b>${som(r.qolgan)}</b></div>`)}
   if(k=="debts")return debts();
+  if(k=="dash")return dash();
   const q=k.startsWith("q:");
   const r=await api(q?"adm_queue":k,q?{xizmat:k.slice(2)}:{});
   if(!r.ok)return err(r);
@@ -52,6 +53,22 @@ function orderView(){show('<input id="on" placeholder="Buyurtma raqami (B-00001)
 async function ord(){const r=await api("order",{orderNo:$("on").value.trim(),phone4:$("p4")?$("p4").value.trim():""});$("o").innerHTML=r.ok?'<div class="c"><pre>'+esc(r.text)+'</pre></div>':'<div class="c">❌ '+esc(r.error)+'</div>'}
 async function admOrder(no){const r=await api("adm_order",{orderNo:no});if(r.ok)show('<div class="c"><pre>'+esc(r.text)+'</pre></div><button onclick="go(\'adm_orders\')">← Orqaga</button>');else err(r)}
 const card=(e,btn)=>`<div class="c"><b>${esc(e.orderNo)}</b> — ${esc(e.xizmat)}<br><span class="m">${esc(e.miqdor)} ${esc(e.birlik)} · ${esc(e.holat)}${e.bajarildi?' · bajarildi: '+esc(e.bajarildi):''}</span><br><br>${btn}</div>`;
+let MON="";
+function months(){const a=[],d=new Date();for(let i=0;i<6;i++){const x=new Date(d.getFullYear(),d.getMonth()-i,1);a.push(x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0"))}return a}
+async function dash(m){
+  MON=m||MON||months()[0];
+  const r=await api("adm_dash",{month:MON});if(!r.ok)return err(r);
+  const j=r.jami,pct=u=>u.hisoblangan?Math.round(u.tolangan/u.hisoblangan*100):0;
+  show(`<select id="mo" onchange="dash(this.value)" style="width:100%;padding:10px;border-radius:10px;font:inherit;margin-bottom:8px">${months().map(x=>`<option ${x==MON?'selected':''}>${x}</option>`).join("")}</select>
+  <div class="c"><b>${MON}</b><br>Hisoblangan: ${som(j.hisoblangan)}<br>To'langan: ${som(j.tolangan)}<br>To'lanishi kerak: <b>${som(j.qolgan)}</b><br><span class="m">${Object.keys(r.xizmat).map(k=>esc(k)+": "+som(r.xizmat[k])).join(" · ")}</span></div>
+  <div class="c" style="color:#b3261e">Barcha oylar bo'yicha to'lanmagan: <b>${som(r.barchaQarz)}</b></div>`+
+  (r.ustalar.map((u,i)=>`<div class="c" onclick="dashU(${i})" style="cursor:pointer"><b>${esc(u.ism)}</b> ›<br>Hisoblangan: ${som(u.hisoblangan)} · ${u.soni} ta ish<br><div style="height:6px;border-radius:3px;background:#0002;margin:6px 0"><div style="height:6px;border-radius:3px;background:#2e7d32;width:${pct(u)}%"></div></div>To'langan: ${som(u.tolangan)} · <b>Qoldi: ${som(u.qolgan)}</b></div>`).join("")||'<p class="m">Bu oyda yozuv yo\'q</p>'));
+  window.DU=r.ustalar;
+}
+async function dashU(i){
+  const u=DU[i],r=await api("adm_dash_usta",{month:MON,usta:u.ustaId});if(!r.ok)return err(r);
+  show(`<h2>${esc(u.ism)} — ${MON}</h2>`+(r.items.map(x=>`<div class="c"><b>${esc(x.orderNo)}</b> — ${esc(x.xizmat)}<br><span class="m">${esc(x.sana)} · ${esc(x.miqdor)} ${esc(x.birlik)} · ${esc(x.holat)}</span><br>${som(x.summa)}</div>`).join("")||'<p class="m">Yozuv yo\'q</p>')+'<button onclick="dash()">← Orqaga</button>');
+}
 async function debts(){
   const r=await api("adm_debts");if(!r.ok)return err(r);
   window.D=r.ustalar;

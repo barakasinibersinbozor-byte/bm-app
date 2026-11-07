@@ -51,7 +51,7 @@ async function go(k){
 function orderView(){show('<input id="on" placeholder="Buyurtma raqami (B-00001)">'+(ROLE=="MIJOZ"?'<input id="p4" inputmode="numeric" maxlength="4" placeholder="Telefoningizning oxirgi 4 raqami">':'')+'<button class="p" onclick="ord()">Ko\'rish</button><div id="o"></div>')}
 async function ord(){const r=await api("order",{orderNo:$("on").value.trim(),phone4:$("p4")?$("p4").value.trim():""});$("o").innerHTML=r.ok?'<div class="c"><pre>'+esc(r.text)+'</pre></div>':'<div class="c">❌ '+esc(r.error)+'</div>'}
 async function admOrder(no){const r=await api("adm_order",{orderNo:no});if(r.ok)show('<div class="c"><pre>'+esc(r.text)+'</pre></div><button onclick="go(\'adm_orders\')">← Orqaga</button>');else err(r)}
-const card=(e,btn)=>`<div class="c"><b>${esc(e.orderNo)}</b> — ${esc(e.xizmat)}<br><span class="m">${esc(e.miqdor)} ${esc(e.birlik)} · ${esc(e.holat)}</span><br><br>${btn}</div>`;
+const card=(e,btn)=>`<div class="c"><b>${esc(e.orderNo)}</b> — ${esc(e.xizmat)}<br><span class="m">${esc(e.miqdor)} ${esc(e.birlik)} · ${esc(e.holat)}${e.bajarildi?' · bajarildi: '+esc(e.bajarildi):''}</span><br><br>${btn}</div>`;
 async function debts(){
   const r=await api("adm_debts");if(!r.ok)return err(r);
   window.D=r.ustalar;
@@ -73,16 +73,22 @@ function pay(i){
 async function jobs(){
   const r=await api("jobs");if(!r.ok)return err(r);
   let h="<h2>Mening ishlarim</h2>";
-  h+=r.mine.map(e=>card(e,e.holat=="QABUL QILINDI"?`<button class="p" onclick="act('start','${e.etapId}')">🔨 Boshlash</button>`:`<button class="p" onclick="fin('${e.etapId}')">✅ Tugatdim</button>`)).join("")||'<p class="m">Faol ish yo\'q</p>';
+  h+=r.mine.map(e=>card(e,e.holat=="QABUL QILINDI"?`<button class="p" onclick="act('start','${e.etapId}')">🔨 Boshlash</button>`:`<button onclick="part('${e.etapId}')">➕ Bugungi natija</button> <button class="p" onclick="fin('${e.etapId}',${e.miqdor},${e.bajarildi||0})">✅ Tugatdim</button>`)).join("")||'<p class="m">Faol ish yo\'q</p>';
   h+="<h2>Yangi ishlar</h2>"+(r.open.map(e=>card(e,`<button class="p" onclick="act('accept','${e.etapId}')">📥 Qabul qilish</button>`)).join("")||'<p class="m">Hozircha yangi ish yo\'q 🙌</p>');
   show(h);
 }
 async function act(a,id){const r=await api(a,{etapId:id});r.ok?(tg.HapticFeedback&&tg.HapticFeedback.notificationOccurred("success"),jobs()):(tg.showAlert(r.error),jobs())}
-function fin(id){show(`<div class="c">Necha ta/metr bajardingiz?<br><br><input id="q" type="number" inputmode="decimal" min="0" step="any"><button class="p" onclick="done('${id}')">Tasdiqlash</button> <button onclick="jobs()">Bekor</button></div>`)}
-async function done(id){
-  const q=parseFloat($("q").value.replace(",","."));if(isNaN(q)||q<0)return tg.showAlert("To'g'ri son kiriting");
-  const r=await api("complete",{etapId:id,qty:q});
-  if(r.ok){tg.showAlert("✅ Tugatildi. Ish haqi: "+som(r.ishHaqi));jobs()}else{tg.showAlert(r.error);jobs()}
+function fin(id,reja,done){show(`<div class="c">Jami nechta bajarildi?<br><span class="m">Rejada: ${reja}${done?' · hisobotda: '+done:''}</span><br><br><input id="q" type="number" inputmode="decimal" min="0" step="any" value="${reja}"><button class="p" onclick="done('${id}',${reja})">Tasdiqlash</button> <button onclick="jobs()">Bekor</button></div>`)}
+async function done(id,reja){
+  const q=parseFloat($("q").value.replace(",","."));if(isNaN(q)||q<=0)return tg.showAlert("To'g'ri son kiriting");
+  if(q>reja)return tg.showAlert("Rejadagi miqdor "+reja+". Undan ko'p kiritib bo'lmaydi.");
+  const go=async()=>{const r=await api("complete",{etapId:id,qty:q});tg.showAlert(r.ok?"✅ Tugatildi. Ish haqi: "+som(r.ishHaqi):r.error);jobs()};
+  if(q<reja)tg.showConfirm("Rejada "+reja+", siz "+q+" kiritdingiz. Ishni tugatdingizmi? (qolgani bajarilmaydi)",ok=>{if(ok)go()});else go();
+}
+function part(id){show(`<div class="c">Bugun necha ta/metr bajardingiz?<br><span class="m">Ish tugamaydi, natija saqlanadi.</span><br><br><input id="q" type="number" inputmode="decimal" min="0" step="any"><button class="p" onclick="savePart('${id}')">Saqlash</button> <button onclick="jobs()">Bekor</button></div>`)}
+async function savePart(id){
+  const q=parseFloat($("q").value.replace(",","."));if(isNaN(q)||q<=0)return tg.showAlert("To'g'ri son kiriting");
+  const r=await api("partial",{etapId:id,qty:q});tg.showAlert(r.ok?"✅ Saqlandi. Jami: "+r.bajarildi+" / "+r.reja:r.error);jobs();
 }
 (async()=>{
   if(!tg.initData)return show('<div class="c">Bu ilovani Telegram botingiz ichidan oching.</div>');

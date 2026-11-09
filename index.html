@@ -49,7 +49,12 @@ async function go(k){
   if(!r.ok)return err(r);
   show('<div class="c"><pre>'+esc(r.text)+'</pre></div>'+(r.items||[]).map(o=>`<div class="c" onclick="admOrder('${esc(o.orderNo)}')" style="cursor:pointer">${esc(o.label)} ›</div>`).join(""));
 }
-function orderView(){show('<input id="on" placeholder="Buyurtma raqami (B-00001)">'+(ROLE=="MIJOZ"?'<input id="p4" inputmode="numeric" maxlength="4" placeholder="Telefoningizning oxirgi 4 raqami">':'')+'<button class="p" onclick="ord()">Ko\'rish</button><div id="o"></div>')}
+function orderView(){show('<button class="p" onclick="scanQr()" style="width:100%;margin-bottom:6px">📷 Chekdagi QR kodni skaner qilish</button><div class="m" style="text-align:center;margin-bottom:8px">yoki raqamni yozing:</div><input id="on" placeholder="Buyurtma raqami (B-00001)">'+(ROLE=="MIJOZ"?'<input id="p4" inputmode="numeric" maxlength="4" placeholder="Telefoningizning oxirgi 4 raqami">':'')+'<button class="p" onclick="ord()">Ko\'rish</button><div id="o"></div>')}
+function parseQr(t){t=String(t||"").trim();const m=/(?:start|startapp)=([A-Za-z0-9-]+?)(?:_(\d{4}))?(?:$|[&#\s])/.exec(t)||/^([A-Za-z0-9-]+?)(?:_(\d{4}))?$/.exec(t);return m?{no:m[1],p4:m[2]||""}:null}
+function scanQr(){
+  if(!tg.showScanQrPopup||!(tg.isVersionAtLeast&&tg.isVersionAtLeast("6.4")))return tg.showAlert("Telegram ilovasini yangilang yoki telefon kamerasi bilan QR ni skaner qiling.");
+  tg.showScanQrPopup({text:"Chekdagi QR kodni ko'rsating"},function(t){const q=parseQr(t);if(!q)return false;if($("on"))$("on").value=q.no;if($("p4"))$("p4").value=q.p4;ord();return true});
+}
 async function ord(){const r=await api("order",{orderNo:$("on").value.trim(),phone4:$("p4")?$("p4").value.trim():""});$("o").innerHTML=r.ok?'<div class="c"><pre>'+esc(r.text)+'</pre></div>':'<div class="c">❌ '+esc(r.error)+'</div>'}
 async function admOrder(no){const r=await api("adm_order",{orderNo:no});if(r.ok)show('<div class="c"><pre>'+esc(r.text)+'</pre></div><button onclick="go(\'adm_orders\')">← Orqaga</button>');else err(r)}
 const card=(e,btn)=>`<div class="c"><b>${esc(e.orderNo)}</b> — ${esc(e.xizmat)}<br><span class="m">${esc(e.miqdor)} ${esc(e.birlik)} · ${esc(e.holat)}${e.bajarildi?' · bajarildi: '+esc(e.bajarildi):''}</span><br><br>${btn}</div>`;
@@ -112,5 +117,7 @@ async function savePart(id){
   const r=await api("me");if(!r.ok)return err(r);
   ROLE=r.role;$("t").textContent="👋 "+r.fish;
   go(TABS[ROLE][0][0]);
+  const sp=tg.initDataUnsafe&&tg.initDataUnsafe.start_param,q=sp&&parseQr(sp);
+  if(q&&(ROLE=="MIJOZ"||ROLE=="USTA")){await go("order");$("on").value=q.no;if($("p4"))$("p4").value=q.p4;ord()}
 })();
 </script></body></html>
